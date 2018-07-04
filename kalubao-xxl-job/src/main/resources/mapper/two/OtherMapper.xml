@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.commonrail.kaluli.two.mapper.TwoMapper">
+
+    <select id="getKlbNumBy" resultType="java.lang.Integer">
+        SELECT
+            COUNT(DISTINCT t1.device_id)
+        FROM
+            kalubao_log t1
+        WHERE
+            t1.collect_time <![CDATA[>=]]> #{startTime}
+            AND t1.collect_time <![CDATA[<=]]> #{endTime}
+    </select>
+
+    <select id="getResetNumBy" resultType="java.lang.Integer">
+        SELECT
+            COUNT (t1.sid)
+        FROM
+            kalubao_log t1
+        WHERE
+            SUBSTRING (t1.loginfo FROM 0 FOR 6) = 'Reset'
+            AND t1.collect_time <![CDATA[>=]]> #{startTime}
+            AND t1.collect_time <![CDATA[<=]]> #{endTime}
+    </select>
+
+    <select id="getReconnectNumBy" resultType="java.lang.Integer">
+        SELECT
+            COUNT (t1.sid)
+        FROM
+            kalubao_log t1
+        WHERE
+            SUBSTRING (t1.loginfo FROM 0 FOR 6) = 'Recon'
+            AND t1.collect_time <![CDATA[>=]]> #{startTime}
+            AND t1.collect_time <![CDATA[<=]]> #{endTime}
+    </select>
+
+
+    <select id="getGpsNumBy" resultType="java.lang.Integer">
+        SELECT
+            COUNT (t1.sid)
+        FROM
+            gps_track t1
+        WHERE
+            t1.collect_time <![CDATA[>=]]> #{startTime}
+            AND t1.collect_time <![CDATA[<=]]> #{endTime}
+    </select>
+
+    <select id="getHealthNumBy" resultType="java.lang.Integer">
+        SELECT
+            COUNT (t1.sid)
+        FROM
+            data_collect_total t1
+        WHERE
+            t1.collect_time <![CDATA[>=]]> #{startTime}
+            AND t1.collect_time <![CDATA[<=]]> #{endTime}
+    </select>
+
+    <select id="getModes" resultType="com.commonrail.kaluli.domain.model.KlbModePo">
+        SELECT
+            a1.device_id AS deviceId,
+            a1.used_ver AS usedVer,
+            CASE WHEN a2.run_mode=0 THEN '普通模式'
+            WHEN a2.run_mode = 1 THEN '强力模式'
+            WHEN a2.run_mode = 2 THEN '节油模式'
+            WHEN a2.run_mode ISNULL THEN '无'
+            WHEN a2.run_mode=3 THEN '深度节油模式' END AS modeDesc
+        FROM kalubao_device a1
+        LEFT JOIN
+            (
+            SELECT t1.device_id, t1.run_mode
+            FROM car t1
+            WHERE t1.device_id IS NOT NULL) a2
+        ON a2.device_id = a1.device_id
+        ORDER BY a2.run_mode
+    </select>
+
+
+    <select id="getKlbGpsNumList" resultType="com.commonrail.kaluli.domain.model.NumOfKlbPo">
+        SELECT
+            t1.device_id AS deviceId,
+            CASE WHEN a1.ccnt ISNULL THEN 0 ELSE a1.ccnt END AS cnt
+        FROM
+            gps_track t1
+        LEFT JOIN (
+            SELECT
+                t2.device_id,
+                COUNT (t2.sid) ccnt
+            FROM
+                gps_track t2
+            WHERE
+                t2.collect_time <![CDATA[>=]]> #{startTime}
+                AND t2.collect_time <![CDATA[<=]]> #{endTime}
+            GROUP BY
+              t2.device_id
+        ) a1
+        ON a1.device_id = t1.device_id
+        GROUP BY deviceId, cnt
+        ORDER BY deviceId
+    </select>
+    
+    <select id="getKlbHealthNumList" resultType="com.commonrail.kaluli.domain.model.NumOfKlbPo">
+        SELECT
+            t1.device_id AS deviceId,
+            CASE WHEN a1.ccnt ISNULL THEN 0 ELSE a1.ccnt END AS cnt
+        FROM
+            data_collect_total t1
+        LEFT JOIN (
+            SELECT
+                t2.device_id,
+                COUNT (t2.sid) AS ccnt
+            FROM
+                data_collect_total t2
+            WHERE
+                t2.collect_time <![CDATA[>=]]> #{startTime}
+                AND t2.collect_time <![CDATA[<=]]> #{endTime}
+            GROUP BY
+                t2.device_id
+            ) a1
+        ON a1.device_id = t1.device_id
+        GROUP BY deviceId, cnt
+        ORDER BY deviceId
+    </select>
+
+    <select id="getKlbLoginTimeList" resultType="com.commonrail.kaluli.domain.model.KlbTimePo">
+        SELECT
+            t1.device_id AS deviceId, MAX(t1.create_time) AS createTime
+        FROM
+            device_status_log t1
+        WHERE t1.mode_code = 20761
+            AND t1.device_id IS NOT NULL
+            AND t1.device_id != ''
+            AND t1.create_time IS NOT NULL
+        GROUP BY t1.device_id
+    </select>
+
+    <select id="getKlbLatestReportTimeList" resultType="com.commonrail.kaluli.domain.model.KlbTimePo">
+        SELECT
+            t1.device_id AS deviceId,
+            MAX (t1.collect_time) AS createTime
+        FROM
+            data_collect_total t1
+        WHERE
+            t1.device_id IS NOT NULL
+            AND t1.device_id != ''
+            AND t1.collect_time IS NOT NULL
+        GROUP BY
+            t1.device_id
+    </select>
+
+    <select id="getKlbIsLossDataList" resultType="com.commonrail.kaluli.domain.model.KlbIsLossDataPo">
+        SELECT
+            a2.device_id AS deviceId,
+            CASE WHEN a1.cnt ISNULL THEN 0 ELSE a1.cnt END AS isLossData
+        FROM
+            device_status_log a2
+        LEFT JOIN (
+            SELECT
+                t1.device_id AS device_id,
+                COUNT (t1.mode_code) AS cnt
+            FROM
+                device_status_log t1
+            WHERE
+                t1.mode_code = 20534
+                AND t1.device_id IS NOT NULL
+                AND t1.device_id != ''
+                AND t1.create_time <![CDATA[>=]]> #{startTime}
+                AND t1.create_time <![CDATA[<=]]> #{endTime}
+            GROUP BY
+                t1.device_id
+        ) a1 ON a1.device_id = a2.device_id
+            GROUP BY a2.device_id, cnt
+    </select>
+
+</mapper>
